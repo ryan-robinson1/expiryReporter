@@ -1,0 +1,15 @@
+{
+    "requests": [{
+            "url": "example.com:443",
+            "duration": "5s"
+        },
+        {
+            "url": "cnn.com:443",
+            "duration": "8s"
+        },
+        {
+            "url": "fdfsasaddsafn.com:443",
+            "duration": "1s"
+        }
+    ]
+}

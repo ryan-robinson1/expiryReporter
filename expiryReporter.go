@@ -1,95 +1,71 @@
 package main
 
 import (
-	"bufio"
-	"errors"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	getCertExpiry "github.com/ryan-robinson1/getCertExpiryPackage"
 )
 
+type Requests struct {
+	Requests []Request `json:"requests"`
+}
+
 type Request struct {
-	url      string
-	duration time.Duration
+	Url      string `json:"url"`
+	Duration string `json:"duration"`
 }
 
 type Result struct {
-	url    string
+	Url    string
 	valid  bool
 	time   string
 	expiry string
 	err    error
 }
 
-func fileConverter(filepath string) ([]Request, error) {
-	var reqs []Request
-
-	file, err := os.Open(filepath)
+func parseJson(filepath string) ([]Request, error) {
+	jsonFile, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer jsonFile.Close()
 
-	reader := bufio.NewReader(file)
-	for {
-		line, eoferr := reader.ReadString('\n')
-		line = strings.TrimSuffix(line, "\n")
+	byteValue, _ := ioutil.ReadAll(jsonFile)
 
-		s := strings.Split(line, ", ")
-		dur, err := time.ParseDuration(s[0])
-		if err != nil {
-			return []Request{}, errors.New("err: invalid file format")
-		}
+	var requests Requests
 
-		req := Request{s[1], dur}
-		reqs = append(reqs, req)
-
-		if eoferr != nil {
-			return reqs, nil
-		}
-	}
-
+	json.Unmarshal(byteValue, &requests)
+	return requests.Requests, nil
 }
 
 func doCheck(r Request, rc chan Result) {
-	status, expiry, err := getCertExpiry.GetCertExpiry(r.url, "", "", "", true)
-	rc <- Result{r.url,
+	status, expiry, err := getCertExpiry.GetCertExpiry(r.Url, "", "", "", true)
+	rc <- Result{r.Url,
 		status == 0,
 		time.Now().UTC().Format("2006-01-02 15:04:05"),
 		expiry,
 		err}
 }
 
-func sleepAndExecute(r Request, rc chan Result) {
-	for {
-		doCheck(r, rc)
-		time.Sleep(r.duration)
-	}
-}
-
 //Builds a Report from Result struct
 func BuildReport(r Result) string {
 	if r.err != nil {
-		return "-------------------------------------\n" + r.url + " report\n-------------------------------------\ntime        : " + r.time + "\nerror:       " + r.err.Error() + "\n\n"
+		return "-------------------------------------\n" + r.Url + " report\n-------------------------------------\ntime        : " + r.time + "\nerror       : " + r.err.Error() + "\n\n"
 	}
-	return "-------------------------------------\n" + r.url + " report\n-------------------------------------\ntime        : " + r.time + "\nexpired     : " + strconv.FormatBool(!r.valid) + "\nexpiration  : " + r.expiry + "\n\n"
+	return "-------------------------------------\n" + r.Url + " report\n-------------------------------------\ntime        : " + r.time + "\nexpired     : " + strconv.FormatBool(!r.valid) + "\nexpiration  : " + r.expiry + "\n\n"
 }
 
 func main() {
-	//	reqs, err := fileConverter("input")
-	//	if err != nil {
-	//		fmt.Println(err)
-	//		os.Exit(1)
-	//	}
-
-	reqs := []Request{{"cnn.com:443", 7 * time.Second},
-		{"expired.badssl.com:443", 13 * time.Second},
-		{"example.com:443", 29 * time.Second},
-		{"mainrouter-silkwave.novatr:61617", 22 * time.Second}}
+	reqs, err := parseJson("input.json")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	exit := make(chan bool)
 	results := make(chan Result, 10)
@@ -100,7 +76,12 @@ func main() {
 		go func(r Request) {
 			for {
 				doCheck(r, results)
-				time.Sleep(r.duration)
+				d, err := time.ParseDuration(r.Duration)
+				if err != nil {
+					fmt.Println("err: invalid duration " + r.Duration)
+					os.Exit(1)
+				}
+				time.Sleep(d)
 			}
 		}(r)
 	}
