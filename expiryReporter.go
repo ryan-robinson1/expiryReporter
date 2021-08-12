@@ -1,5 +1,13 @@
 package main
 
+/*
+ *	Ryan Robinson, 2021
+ *
+ *  Simple Go program that takes a Json input specifying URL and time interval. Checks server's cert expiration at every interval and outputs reports to stdout and sterr.
+ *  Built primarily as a demonstration of Go channels.
+ *
+ */
+
 import (
 	"encoding/json"
 	"fmt"
