@@ -1,4 +1,4 @@
-module expiryReporter
+module github.com/ryan-robinson1/expiryReporter
 
 go 1.15
 
